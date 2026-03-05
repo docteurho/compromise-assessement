@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEKERA — Compromise Assessment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep: #0a0e1a;
+      --bg-panel: #0d1117;
+      --bg-panel-alt: #141b2d;
+      --cyan: #00e5ff;
+      --amber: #f59e0b;
+      --text-heading: #e2e8f0;
+      --text-body: #94a3b8;
+      --text-muted: #64748b;
+      --border: #1e293b;
+      --cyan-glow: rgba(0,229,255,0.15);
+      --cyan-glow-strong: rgba(0,229,255,0.3);
+      --amber-glow: rgba(245,158,11,0.15);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg-deep);
+      color: var(--text-body);
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg-deep); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Scan line overlay */
+    .scanline-overlay {
+      position: fixed; inset: 0; pointer-events: none; z-index: 50;
+      mix-blend-mode: overlay;
+    }
+    .scanlines {
+      position: absolute; inset: 0; opacity: 0.04;
+      background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,229,255,0.4) 2px, rgba(0,229,255,0.4) 3px);
+      background-size: 100% 4px;
+    }
+    .scan-beam {
+      position: absolute; left: 0; right: 0; height: 120px; opacity: 0.03;
+      background: linear-gradient(180deg, transparent 0%, rgba(0,229,255,0.2) 50%, transparent 100%);
+      animation: scanline 8s linear infinite;
+    }
+
+    @keyframes scanline {
+      0% { transform: translateY(-120px); }
+      100% { transform: translateY(100vh); }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px var(--cyan-glow); }
+      50% { box-shadow: 0 0 30px var(--cyan-glow-strong), 0 0 60px var(--cyan-glow); }
+    }
+    .pulse-glow-cyan { animation: pulseGlow 3s ease-in-out infinite; }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Divider */
+    .divider {
+      width: 100%; height: 1px;
+      background: linear-gradient(90deg, transparent, #1e293b 20%, #1e293b 80%, transparent);
+    }
+
+    /* ─── HERO ─── */
+    #hero {
+      position: relative; width: 100%; overflow: hidden; min-height: 50vh;
+    }
+    .hero-grid {
+      position: absolute; inset: 0; opacity: 0.6;
+    }
+    .hero-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 600px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content {
+      position: relative; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 6rem 1.5rem;
+    }
+    .brand-mark {
+      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem;
+      opacity: 0; animation: fadeUp 0.6s cubic-bezier(0.16,1,0.3,1) 0.1s forwards;
+    }
+    .brand-icon {
+      width: 48px; height: 48px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, #0d1117 0%, #141b2d 100%);
+      border: 1px solid rgba(0,229,255,0.3);
+    }
+    .brand-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem; font-weight: 700;
+      letter-spacing: 0.3em; text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.375rem 1rem; border-radius: 9999px;
+      background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.15);
+      margin-bottom: 1.5rem;
+      opacity: 0; animation: fadeUp 0.5s ease 0.3s forwards;
+    }
+    .status-badge span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .hero-title {
+      font-size: clamp(2.5rem, 7vw, 5rem); font-weight: 700;
+      text-align: center; margin-bottom: 1rem; letter-spacing: -0.02em;
+      color: var(--text-heading);
+      opacity: 0; animation: fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) 0.4s forwards;
+    }
+    .hero-title .gradient-text {
+      background: linear-gradient(135deg, #00e5ff 0%, #00b8d4 50%, #f59e0b 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero-subtitle {
+      font-size: 1.125rem; text-align: center; max-width: 640px;
+      color: var(--text-body); margin-bottom: 2.5rem;
+      opacity: 0; animation: fadeUp 0.6s ease 0.6s forwards;
+    }
+    .metrics-bar {
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: center; gap: 2.5rem;
+      opacity: 0; animation: fadeUp 0.5s ease 0.8s forwards;
+    }
+    .metric-pill { display: flex; align-items: center; gap: 0.625rem; }
+    .metric-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem; font-weight: 700; color: var(--cyan);
+    }
+    .metric-label {
+      font-size: 0.7rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-muted);
+    }
+    .hero-bottom-line {
+      position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,229,255,0.3) 50%, transparent 100%);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── SECTIONS ─── */
+    .section {
+      width: 100%; padding: 5rem 1.5rem;
+    }
+    .section-inner { max-width: 1152px; margin: 0 auto; }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--cyan);
+      display: block; margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700;
+      color: var(--text-heading); margin-bottom: 0.75rem;
+    }
+    .section-desc {
+      font-size: 1rem; max-width: 640px; color: var(--text-muted);
+    }
+
+    /* Reveal animation */
+    .reveal {
+      opacity: 0; transform: translateY(24px);
+      transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16,1,0.3,1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+    .reveal-scale {
+      opacity: 0; transform: translateY(24px) scale(0.97);
+      transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16,1,0.3,1);
+    }
+    .reveal-scale.visible { opacity: 1; transform: translateY(0) scale(1); }
+
+    /* ─── VALUE LEVELS ─── */
+    .cards-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 3.5rem;
+    }
+    .value-card {
+      position: relative; border-radius: 8px; padding: 1.5rem;
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, #0d1117 0%, #141b2d 100%);
+    }
+    .value-card.cyan {
+      border: 1px solid rgba(0,229,255,0.2);
+      box-shadow: 0 0 30px rgba(0,229,255,0.08), inset 0 1px 0 rgba(0,229,255,0.1);
+    }
+    .value-card.cyan-strong {
+      border: 1px solid rgba(0,229,255,0.25);
+      box-shadow: 0 0 40px rgba(0,229,255,0.12), inset 0 1px 0 rgba(0,229,255,0.15);
+    }
+    .value-card.amber {
+      border: 1px solid rgba(245,158,11,0.2);
+      box-shadow: 0 0 30px rgba(245,158,11,0.08), inset 0 1px 0 rgba(245,158,11,0.1);
+    }
+    .card-top-line {
+      position: absolute; top: 0; left: 1.5rem; right: 1.5rem; height: 1px;
+      background: linear-gradient(90deg, transparent, #00e5ff, transparent);
+    }
+    .card-icon {
+      width: 48px; height: 48px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem;
+    }
+    .icon-cyan { background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.2); }
+    .icon-amber { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); }
+    .card-level {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 0.5rem; display: block;
+    }
+    .card-level.cyan { color: var(--cyan); }
+    .card-level.amber { color: var(--amber); }
+    .card-title {
+      font-size: 1.25rem; font-weight: 700;
+      color: var(--text-heading); margin-bottom: 0.75rem;
+    }
+    .card-body {
+      font-size: 0.875rem; line-height: 1.6;
+      color: var(--text-body); margin-bottom: 1.5rem; flex: 1;
+    }
+    .metric-rows {
+      border-top: 1px solid rgba(30,41,59,0.8);
+      padding-top: 1rem; display: flex; flex-direction: column; gap: 0.625rem;
+    }
+    .metric-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .metric-row .label { font-size: 0.75rem; color: var(--text-muted); }
+    .metric-row .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 500; color: var(--text-heading);
+    }
+
+    /* ─── USE CASE TRIGGERS ─── */
+    .domain-tabs {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      margin-top: 2.5rem; margin-bottom: 2rem;
+    }
+    .domain-tab {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.625rem 1rem; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 500; cursor: pointer;
+      border: 1px solid rgba(30,41,59,0.5);
+      background: rgba(13,17,23,0.6); color: var(--text-muted);
+      transition: all 0.3s ease; user-select: none;
+    }
+    .domain-tab .count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px;
+      background: rgba(30,41,59,0.4); color: var(--text-muted);
+      transition: all 0.3s ease;
+    }
+    .domain-tab svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .use-case-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      transition: opacity 0.3s ease;
+    }
+    .use-case-card {
+      border-radius: 8px; padding: 1.25rem;
+      background: var(--bg-panel); cursor: pointer;
+      transition: box-shadow 0.3s, border-color 0.3s;
+    }
+    .domain-badge {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      padding: 0.25rem 0.625rem; border-radius: 4px;
+      font-size: 0.75rem; font-weight: 500; margin-bottom: 1rem;
+    }
+    .domain-badge svg { width: 12px; height: 12px; }
+    .use-case-title {
+      font-size: 1rem; font-weight: 600;
+      color: var(--text-heading); margin-bottom: 0.5rem;
+    }
+    .use-case-desc {
+      font-size: 0.875rem; line-height: 1.6;
+      color: var(--text-body); margin-bottom: 1rem;
+    }
+    .explore-link {
+      display: flex; align-items: center; gap: 0.25rem;
+      font-size: 0.75rem; font-weight: 500;
+      transition: gap 0.2s;
+    }
+    .explore-link:hover { gap: 0.5rem; }
+    .explore-link svg { width: 14px; height: 14px; }
+
+    /* ─── SYNERGIES HUB ─── */
+    .synergies-layout {
+      margin-top: 3.5rem;
+      display: flex; flex-direction: column; align-items: center; gap: 3rem;
+    }
+    @media (min-width: 1024px) {
+      .synergies-layout { flex-direction: row; align-items: center; }
+    }
+    .hub-diagram {
+      position: relative; flex-shrink: 0;
+      width: 340px; height: 340px;
+    }
+    @media (min-width: 1024px) {
+      .hub-diagram { width: 400px; height: 400px; }
+    }
+    .hub-svg { width: 100%; height: 100%; }
+    .center-node {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0d1117 0%, #141b2d 100%);
+      border: 2px solid rgba(0,229,255,0.4);
+    }
+    .center-node .ca-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 700; color: var(--cyan);
+    }
+    .center-node .ca-sub {
+      font-size: 0.55rem; margin-top: 2px; color: var(--text-muted);
+    }
+    .sat-node {
+      position: absolute;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border-radius: 50%; background: var(--bg-panel);
+      opacity: 0; transform: scale(0);
+      transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16,1,0.3,1);
+    }
+    .sat-node.visible { opacity: 1; transform: scale(1); }
+    .sat-node svg { width: 20px; height: 20px; }
+    .sat-node span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5rem; margin-top: 2px; font-weight: 500;
+    }
+    .synergy-cards { flex: 1; display: flex; flex-direction: column; gap: 1rem; width: 100%; }
+    .synergy-card {
+      border-radius: 8px; padding: 1.25rem;
+      background: var(--bg-panel);
+    }
+    .synergy-card-header {
+      display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;
+    }
+    .synergy-card-header svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .synergy-card-title {
+      font-size: 0.875rem; font-weight: 600; color: var(--text-heading);
+    }
+    .synergy-card-body { font-size: 0.875rem; color: var(--text-body); }
+
+    /* ─── BUYER SEGMENTATION ─── */
+    .buyer-table-wrap {
+      margin-top: 3.5rem; border-radius: 8px;
+      border: 1px solid var(--border); overflow-x: auto;
+    }
+    .buyer-table {
+      width: 100%; text-align: left;
+      border-collapse: separate; border-spacing: 0;
+    }
+    .buyer-table th {
+      padding: 1rem 1.25rem; font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .buyer-table th:first-child { color: var(--text-muted); border-bottom-color: var(--border); }
+    .buyer-table th.buyer-col { color: var(--cyan); border-bottom-color: rgba(0,229,255,0.2); }
+    .buyer-table th .buyer-role {
+      font-weight: 400; font-size: 0.625rem; margin-top: 2px;
+      color: var(--text-muted); display: block;
+    }
+    .buyer-table td {
+      padding: 1rem 1.25rem; font-size: 0.875rem;
+      color: var(--text-heading); border-bottom: 1px solid var(--border);
+    }
+    .buyer-table tr:last-child td { border-bottom: none; }
+    .row-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; font-weight: 500; color: var(--text-body);
+    }
+    .buyer-table tr:nth-child(odd) td { background: var(--bg-panel-alt); }
+    .buyer-table tr:nth-child(even) td { background: var(--bg-panel); }
+    .buyer-table tr:nth-child(odd) th { background: var(--bg-panel-alt); }
+
+    /* Mobile buyer cards */
+    .buyer-cards { display: none; margin-top: 3.5rem; flex-direction: column; gap: 1rem; }
+    @media (max-width: 767px) {
+      .buyer-table-wrap { display: none; }
+      .buyer-cards { display: flex; }
+    }
+    .buyer-card {
+      border-radius: 8px; padding: 1.25rem;
+      background: var(--bg-panel); border: 1px solid var(--border);
+    }
+    .buyer-card-header { margin-bottom: 1rem; }
+    .buyer-card-persona {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem; font-weight: 700; color: var(--cyan);
+    }
+    .buyer-card-role { font-size: 0.75rem; color: var(--text-muted); }
+    .buyer-card-rows { display: flex; flex-direction: column; gap: 0.75rem; }
+    .buyer-card-row-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.625rem; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--text-muted);
+      display: block; margin-bottom: 2px;
+    }
+    .buyer-card-row-val { font-size: 0.875rem; color: var(--text-heading); }
+
+    /* ─── GTM MODELS ─── */
+    .gtm-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 3.5rem;
+    }
+    .gtm-card {
+      position: relative; border-radius: 8px; overflow: hidden;
+      display: flex; flex-direction: column;
+      background: linear-gradient(180deg, #0d1117 0%, #141b2d 100%);
+    }
+    .gtm-card-inner { padding: 1.5rem; display: flex; flex-direction: column; flex: 1; }
+    .gtm-top-bar { height: 4px; width: 100%; }
+    .gtm-model-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem; letter-spacing: 0.1em;
+      text-transform: uppercase; margin-bottom: 0.25rem; display: block;
+    }
+    .gtm-title {
+      font-size: 1.25rem; font-weight: 700;
+      color: var(--text-heading); margin-bottom: 0.75rem;
+    }
+    .gtm-desc {
+      font-size: 0.875rem; line-height: 1.6;
+      color: var(--text-body); margin-bottom: 1.5rem; flex: 1;
+    }
+    .detail-rows {
+      border-top: 1px solid rgba(30,41,59,0.8);
+      padding-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;
+    }
+    .detail-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .detail-row .lbl { font-size: 0.75rem; color: var(--text-muted); }
+    .detail-row .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 500; color: var(--text-heading);
+    }
+    .detail-row .val.accent-cyan { color: var(--cyan); }
+    .detail-row .val.accent-amber { color: var(--amber); }
+
+    /* ─── FOOTER ─── */
+    footer {
+      width: 100%; padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    .footer-line {
+      width: 100%; height: 1px; margin-bottom: 2rem;
+      background: linear-gradient(90deg, transparent, rgba(0,229,255,0.2) 50%, transparent);
+    }
+    .footer-brand {
+      display: flex; align-items: center; justify-content: center;
+      gap: 0.5rem; margin-bottom: 0.75rem;
+    }
+    .footer-brand .name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem; font-weight: 700;
+      letter-spacing: 0.2em; color: var(--cyan);
+    }
+    .footer-brand .sep { font-size: 0.75rem; color: var(--text-muted); }
+    .footer-brand .svc {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; color: var(--text-muted);
+    }
+    .footer-conf { font-size: 0.75rem; color: #475569; }
+    .footer-ver {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.625rem; margin-top: 0.5rem; color: #334155;
+    }
+
+    /* SVG icons inline */
+    svg.icon { display: inline-block; }
+
+    @media (max-width: 640px) {
+      .hero-content { padding: 4rem 1.5rem; }
+      .metrics-bar { gap: 1.5rem; }
+      .section { padding: 3.5rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Scan line overlay -->
+<div class="scanline-overlay" aria-hidden="true">
+  <div class="scanlines"></div>
+  <div class="scan-beam"></div>
+</div>
+
+<main>
+  <!-- ─── HERO ─── -->
+  <section id="hero">
+    <div class="hero-grid grid-bg"></div>
+    <div class="hero-glow"></div>
+    <div class="hero-content">
+      <div class="brand-mark">
+        <img src="data:image/png;base64,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" alt="SEKERA" style="height:56px;width:auto;object-fit:contain;" />
+      </div>
+      <div class="status-badge">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        <span>Document Stratégique — Confidentiel</span>
+      </div>
+      <h1 class="hero-title">
+        Compromise <span class="gradient-text">Assessment</span>
+      </h1>
+      <p class="hero-subtitle">
+        Stratégie Commerciale — Positionnement, Segmentation & Modèles de Mise en Marché
+      </p>
+      <div class="metrics-bar">
+        <div class="metric-pill">
+          <span class="metric-value">3</span>
+          <span class="metric-label">Niveaux de Valeur</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-value">12</span>
+          <span class="metric-label">Cas d'Usage</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-value">4</span>
+          <span class="metric-label">Synergies BU</span>
+        </div>
+        <div class="metric-pill">
+          <span class="metric-value">4</span>
+          <span class="metric-label">Segments Cibles</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-bottom-line"></div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── VALUE LEVELS ─── -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal">
+        <span class="section-label mono">[01]</span>
+        <h2 class="section-title">Niveaux de Valeur</h2>
+        <p class="section-desc">Trois niveaux d'impact pour positionner le Compromise Assessment auprès de chaque audience.</p>
+      </div>
+      <div class="cards-grid">
+        <!-- Tactique -->
+        <div class="reveal reveal-delay-1">
+          <div class="value-card cyan">
+            <div class="card-icon icon-cyan">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <span class="card-level cyan mono">Niveau 01</span>
+            <h3 class="card-title">Tactique</h3>
+            <p class="card-body">Détection des menaces actives, analyse des indicateurs de compromission (IOC), identification des accès non autorisés et des mouvements latéraux dans l'infrastructure.</p>
+            <div class="metric-rows">
+              <div class="metric-row"><span class="label">Détection IOC</span><span class="val mono">Temps réel</span></div>
+              <div class="metric-row"><span class="label">Couverture</span><span class="val mono">Endpoints + Réseau</span></div>
+              <div class="metric-row"><span class="label">Livrable</span><span class="val mono">Rapport technique</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Opérationnel -->
+        <div class="reveal reveal-delay-2">
+          <div class="value-card cyan-strong">
+            <div class="card-top-line"></div>
+            <div class="card-icon icon-cyan">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>
+            </div>
+            <span class="card-level cyan mono">Niveau 02</span>
+            <h3 class="card-title">Opérationnel</h3>
+            <p class="card-body">Cartographie de la surface d'attaque, priorisation des vulnérabilités exploitables, évaluation de la posture défensive et recommandations de remédiation ciblées.</p>
+            <div class="metric-rows">
+              <div class="metric-row"><span class="label">Surface d'attaque</span><span class="val mono">Cartographie complète</span></div>
+              <div class="metric-row"><span class="label">Priorisation</span><span class="val mono">CVSS + Contexte</span></div>
+              <div class="metric-row"><span class="label">Livrable</span><span class="val mono">Plan de remédiation</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- Stratégique -->
+        <div class="reveal reveal-delay-3">
+          <div class="value-card amber">
+            <div class="card-icon icon-amber">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+            </div>
+            <span class="card-level amber mono">Niveau 03</span>
+            <h3 class="card-title">Stratégique</h3>
+            <p class="card-body">Posture de risque exécutive, reporting adapté au conseil d'administration, alignement avec les cadres réglementaires et benchmarking sectoriel.</p>
+            <div class="metric-rows">
+              <div class="metric-row"><span class="label">Audience</span><span class="val mono">COMEX / Board</span></div>
+              <div class="metric-row"><span class="label">Cadres</span><span class="val mono">NIST, ISO 27001</span></div>
+              <div class="metric-row"><span class="label">Livrable</span><span class="val mono">Dashboard exécutif</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── USE CASE TRIGGERS ─── -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal">
+        <span class="section-label mono">[02]</span>
+        <h2 class="section-title">Déclencheurs par Domaine</h2>
+        <p class="section-desc">12 cas d'usage concrets regroupés par domaine d'intervention pour identifier les opportunités commerciales.</p>
+      </div>
+      <div class="domain-tabs reveal" id="domain-tabs"></div>
+      <div class="use-case-grid reveal" id="use-case-grid"></div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── SYNERGIES HUB ─── -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal">
+        <span class="section-label mono">[03]</span>
+        <h2 class="section-title">Synergies Inter-BU</h2>
+        <p class="section-desc">Le Compromise Assessment comme pivot central alimentant et enrichissant chaque business unit.</p>
+      </div>
+      <div class="synergies-layout">
+        <!-- Hub diagram -->
+        <div class="hub-diagram reveal" id="hub-diagram">
+          <svg class="hub-svg" viewBox="0 0 400 400" aria-hidden="true" id="hub-svg">
+            <!-- Orbital ring -->
+            <circle cx="200" cy="200" r="140" fill="none" stroke="rgba(0,229,255,0.06)" stroke-width="1" stroke-dasharray="4 6"/>
+          </svg>
+          <!-- Center node -->
+          <div class="center-node pulse-glow-cyan" id="center-node" style="width:100px;height:100px;top:150px;left:150px;">
+            <span class="ca-label">CA</span>
+            <span class="ca-sub">Assessment</span>
+          </div>
+          <!-- Satellite nodes inserted by JS -->
+        </div>
+        <!-- Synergy cards -->
+        <div class="synergy-cards reveal reveal-delay-2">
+          <div class="synergy-card" style="border:1px solid rgba(59,130,246,0.2)">
+            <div class="synergy-card-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <span class="synergy-card-title">Blue Team → CA</span>
+            </div>
+            <p class="synergy-card-body">Alimentation en logs et télémétrie. Le CA valide l'efficacité des règles de détection et identifie les angles morts du SOC.</p>
+          </div>
+          <div class="synergy-card" style="border:1px solid rgba(239,68,68,0.2)">
+            <div class="synergy-card-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>
+              <span class="synergy-card-title">Red Team → CA</span>
+            </div>
+            <p class="synergy-card-body">Scénarios d'attaque réalistes enrichissant les hypothèses de compromission. Le CA fournit le terrain de vérité post-exercice.</p>
+          </div>
+          <div class="synergy-card" style="border:1px solid rgba(34,197,94,0.2)">
+            <div class="synergy-card-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>
+              <span class="synergy-card-title">GRC → CA</span>
+            </div>
+            <p class="synergy-card-body">Cadres de conformité et exigences réglementaires. Le CA produit les preuves d'évaluation pour les audits et certifications.</p>
+          </div>
+          <div class="synergy-card" style="border:1px solid rgba(168,85,247,0.2)">
+            <div class="synergy-card-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+              <span class="synergy-card-title">Academy → CA</span>
+            </div>
+            <p class="synergy-card-body">Retours d'expérience terrain pour enrichir les formations. Le CA identifie les lacunes de compétences à adresser.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── BUYER SEGMENTATION ─── -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal">
+        <span class="section-label mono">[04]</span>
+        <h2 class="section-title">Segmentation Acheteurs</h2>
+        <p class="section-desc">Quatre profils décisionnaires avec leurs motivations, cycles et messages adaptés.</p>
+      </div>
+      <!-- Desktop table -->
+      <div class="buyer-table-wrap reveal reveal-delay-1">
+        <table class="buyer-table">
+          <thead>
+            <tr>
+              <th>Critère</th>
+              <th class="buyer-col">RSSI / CISO<span class="buyer-role">Sécurité Opérationnelle</span></th>
+              <th class="buyer-col">DSI / CIO<span class="buyer-role">Direction Informatique</span></th>
+              <th class="buyer-col">DG / CEO<span class="buyer-role">Direction Générale</span></th>
+              <th class="buyer-col">Compliance Officer<span class="buyer-role">Conformité & Risques</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-label">Motivation principale</td>
+              <td>Réduire le risque résiduel et valider les contrôles existants</td>
+              <td>Protéger les actifs IT et justifier les investissements sécurité</td>
+              <td>Protéger la réputation et assurer la continuité d'activité</td>
+              <td>Démontrer la conformité réglementaire et réduire les sanctions</td>
+            </tr>
+            <tr>
+              <td class="row-label">Budget type</td>
+              <td>Budget sécurité (OPEX)</td>
+              <td>Budget IT (CAPEX/OPEX)</td>
+              <td>Budget stratégique</td>
+              <td>Budget conformité</td>
+            </tr>
+            <tr>
+              <td class="row-label">Cycle de décision</td>
+              <td>2-4 semaines</td>
+              <td>4-8 semaines</td>
+              <td>6-12 semaines</td>
+              <td>4-6 semaines</td>
+            </tr>
+            <tr>
+              <td class="row-label">Message clé</td>
+              <td>Visibilité immédiate sur les menaces actives dans votre SI</td>
+              <td>ROI mesurable et réduction quantifiée de l'exposition</td>
+              <td>Assurance de résilience pour le conseil d'administration</td>
+              <td>Preuves tangibles de diligence raisonnable en cybersécurité</td>
+            </tr>
+            <tr>
+              <td class="row-label">Niveau de maturité</td>
+              <td>Élevée</td>
+              <td>Moyenne à Élevée</td>
+              <td>Variable</td>
+              <td>Moyenne</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- Mobile cards -->
+      <div class="buyer-cards" id="buyer-cards">
+        <div class="buyer-card"><div class="buyer-card-header"><div class="buyer-card-persona">RSSI / CISO</div><div class="buyer-card-role">Sécurité Opérationnelle</div></div><div class="buyer-card-rows"><div><span class="buyer-card-row-label">Motivation</span><span class="buyer-card-row-val">Réduire le risque résiduel et valider les contrôles existants</span></div><div><span class="buyer-card-row-label">Budget</span><span class="buyer-card-row-val">Budget sécurité (OPEX)</span></div><div><span class="buyer-card-row-label">Cycle</span><span class="buyer-card-row-val">2-4 semaines</span></div><div><span class="buyer-card-row-label">Message</span><span class="buyer-card-row-val">Visibilité immédiate sur les menaces actives dans votre SI</span></div><div><span class="buyer-card-row-label">Maturité</span><span class="buyer-card-row-val">Élevée</span></div></div></div>
+        <div class="buyer-card"><div class="buyer-card-header"><div class="buyer-card-persona">DSI / CIO</div><div class="buyer-card-role">Direction Informatique</div></div><div class="buyer-card-rows"><div><span class="buyer-card-row-label">Motivation</span><span class="buyer-card-row-val">Protéger les actifs IT et justifier les investissements sécurité</span></div><div><span class="buyer-card-row-label">Budget</span><span class="buyer-card-row-val">Budget IT (CAPEX/OPEX)</span></div><div><span class="buyer-card-row-label">Cycle</span><span class="buyer-card-row-val">4-8 semaines</span></div><div><span class="buyer-card-row-label">Message</span><span class="buyer-card-row-val">ROI mesurable et réduction quantifiée de l'exposition</span></div><div><span class="buyer-card-row-label">Maturité</span><span class="buyer-card-row-val">Moyenne à Élevée</span></div></div></div>
+        <div class="buyer-card"><div class="buyer-card-header"><div class="buyer-card-persona">DG / CEO</div><div class="buyer-card-role">Direction Générale</div></div><div class="buyer-card-rows"><div><span class="buyer-card-row-label">Motivation</span><span class="buyer-card-row-val">Protéger la réputation et assurer la continuité d'activité</span></div><div><span class="buyer-card-row-label">Budget</span><span class="buyer-card-row-val">Budget stratégique</span></div><div><span class="buyer-card-row-label">Cycle</span><span class="buyer-card-row-val">6-12 semaines</span></div><div><span class="buyer-card-row-label">Message</span><span class="buyer-card-row-val">Assurance de résilience pour le conseil d'administration</span></div><div><span class="buyer-card-row-label">Maturité</span><span class="buyer-card-row-val">Variable</span></div></div></div>
+        <div class="buyer-card"><div class="buyer-card-header"><div class="buyer-card-persona">Compliance Officer</div><div class="buyer-card-role">Conformité & Risques</div></div><div class="buyer-card-rows"><div><span class="buyer-card-row-label">Motivation</span><span class="buyer-card-row-val">Démontrer la conformité réglementaire et réduire les sanctions</span></div><div><span class="buyer-card-row-label">Budget</span><span class="buyer-card-row-val">Budget conformité</span></div><div><span class="buyer-card-row-label">Cycle</span><span class="buyer-card-row-val">4-6 semaines</span></div><div><span class="buyer-card-row-label">Message</span><span class="buyer-card-row-val">Preuves tangibles de diligence raisonnable en cybersécurité</span></div><div><span class="buyer-card-row-label">Maturité</span><span class="buyer-card-row-val">Moyenne</span></div></div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── GTM MODELS ─── -->
+  <section class="section">
+    <div class="section-inner">
+      <div class="reveal">
+        <span class="section-label mono">[05]</span>
+        <h2 class="section-title">Modèles Go-to-Market</h2>
+        <p class="section-desc">Trois approches complémentaires pour adresser le marché du Compromise Assessment.</p>
+      </div>
+      <div class="gtm-grid">
+        <!-- Direct -->
+        <div class="reveal reveal-scale reveal-delay-1">
+          <div class="gtm-card" style="border:2px solid rgba(0,229,255,0.35);box-shadow:0 0 40px rgba(0,229,255,0.1),inset 0 1px 0 rgba(0,229,255,0.15)">
+            <div class="gtm-top-bar" style="background:#00e5ff"></div>
+            <div class="gtm-card-inner">
+              <div class="card-icon icon-cyan" style="margin-bottom:1.25rem">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+              </div>
+              <span class="gtm-model-num mono" style="color:#00e5ff">Modèle 01</span>
+              <h3 class="gtm-title">Approche Directe</h3>
+              <p class="gtm-desc">Vente directe par l'équipe commerciale SEKERA. Relation privilégiée avec les grands comptes et ETI, cycle de vente maîtrisé de bout en bout.</p>
+              <div class="detail-rows">
+                <div class="detail-row"><span class="lbl">Canaux</span><span class="val">Équipe commerciale dédiée</span></div>
+                <div class="detail-row"><span class="lbl">Cibles</span><span class="val">Grands comptes, ETI</span></div>
+                <div class="detail-row"><span class="lbl">Cycle moyen</span><span class="val">4-8 semaines</span></div>
+                <div class="detail-row"><span class="lbl">Marge</span><span class="val accent-cyan">Élevée (70-80%)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Partenaire -->
+        <div class="reveal reveal-scale reveal-delay-2">
+          <div class="gtm-card" style="border:2px solid rgba(245,158,11,0.35);box-shadow:0 0 40px rgba(245,158,11,0.1),inset 0 1px 0 rgba(245,158,11,0.15)">
+            <div class="gtm-top-bar" style="background:linear-gradient(90deg,#f59e0b,#fbbf24)"></div>
+            <div class="gtm-card-inner">
+              <div class="card-icon icon-amber" style="margin-bottom:1.25rem">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              </div>
+              <span class="gtm-model-num mono" style="color:#f59e0b">Modèle 02</span>
+              <h3 class="gtm-title">Approche Partenaire</h3>
+              <p class="gtm-desc">Distribution via un réseau de partenaires certifiés — intégrateurs, MSSP et cabinets de conseil. Effet de levier sur leur base installée.</p>
+              <div class="detail-rows">
+                <div class="detail-row"><span class="lbl">Canaux</span><span class="val">MSSP, Intégrateurs, Conseil</span></div>
+                <div class="detail-row"><span class="lbl">Cibles</span><span class="val">PME, ETI, Secteur public</span></div>
+                <div class="detail-row"><span class="lbl">Cycle moyen</span><span class="val">6-12 semaines</span></div>
+                <div class="detail-row"><span class="lbl">Marge</span><span class="val accent-amber">Moyenne (40-55%)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Hybride -->
+        <div class="reveal reveal-scale reveal-delay-3">
+          <div class="gtm-card" style="border:2px solid rgba(0,229,255,0.3);box-shadow:0 0 30px rgba(0,229,255,0.06),0 0 30px rgba(245,158,11,0.06)">
+            <div class="gtm-top-bar" style="background:linear-gradient(90deg,#00e5ff 0%,#00e5ff 50%,#f59e0b 50%,#f59e0b 100%)"></div>
+            <div class="gtm-card-inner">
+              <div class="card-icon" style="background:linear-gradient(135deg,rgba(0,229,255,0.08),rgba(245,158,11,0.08));border:1px solid rgba(0,229,255,0.15);margin-bottom:1.25rem">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5.5" y2="16.5"/><line x1="12" y1="8" x2="18.5" y2="16.5"/></svg>
+              </div>
+              <span class="gtm-model-num mono" style="background:linear-gradient(90deg,#00e5ff,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Modèle 03</span>
+              <h3 class="gtm-title">Approche Hybride</h3>
+              <p class="gtm-desc">Combinaison optimale : prospection directe pour les comptes stratégiques, activation partenaire pour la couverture territoriale et sectorielle.</p>
+              <div class="detail-rows">
+                <div class="detail-row"><span class="lbl">Canaux</span><span class="val">Direct + Partenaires</span></div>
+                <div class="detail-row"><span class="lbl">Cibles</span><span class="val">Tous segments</span></div>
+                <div class="detail-row"><span class="lbl">Cycle moyen</span><span class="val">4-10 semaines</span></div>
+                <div class="detail-row"><span class="lbl">Marge</span><span class="val accent-cyan">Optimisée (55-70%)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ─── -->
+  <footer>
+    <div class="footer-line"></div>
+    <div class="footer-brand">
+      <img src="data:image/png;base64,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" alt="SEKERA" style="height:32px;width:auto;object-fit:contain;opacity:0.7;" />
+    </div>
+    <p class="footer-conf">Document stratégique confidentiel — Usage interne uniquement</p>
+    <p class="footer-ver">v2.1 — Dernière mise à jour : Février 2026</p>
+  </footer>
+</main>
+
+<script>
+// ─── USE CASE DATA ───
+const domains = [
+  {
+    key: 'finance', label: 'Finance', color: '#22c55e',
+    colorBg: 'rgba(34,197,94,0.08)', colorBorder: 'rgba(34,197,94,0.25)',
+    colorGlow: 'rgba(34,197,94,0.15)',
+    icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+    items: [
+      { title: 'Audit Post-M&A', description: "Évaluation de la posture cyber d'une entité acquise avant intégration au SI." },
+      { title: 'Qualification Cyber-Assurance', description: 'Démonstration de maturité pour obtenir ou renouveler une police de cyber-assurance.' },
+      { title: 'Investigation Fraude', description: 'Recherche de traces de compromission liées à des activités frauduleuses détectées.' }
+    ]
+  },
+  {
+    key: 'gouvernance', label: 'Gouvernance', color: '#3b82f6',
+    colorBg: 'rgba(59,130,246,0.08)', colorBorder: 'rgba(59,130,246,0.25)',
+    colorGlow: 'rgba(59,130,246,0.15)',
+    icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>`,
+    items: [
+      { title: 'Conformité Réglementaire', description: 'Validation de conformité NIS2, DORA, LPM via une évaluation indépendante.' },
+      { title: 'Audit de Maturité', description: 'Mesure du niveau de maturité cyber par rapport aux référentiels NIST/ISO.' },
+      { title: 'Due Diligence', description: 'Évaluation approfondie dans le cadre de partenariats stratégiques ou investissements.' }
+    ]
+  },
+  {
+    key: 'performance', label: 'Performance', color: '#f59e0b',
+    colorBg: 'rgba(245,158,11,0.08)', colorBorder: 'rgba(245,158,11,0.25)',
+    colorGlow: 'rgba(245,158,11,0.15)',
+    icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>`,
+    items: [
+      { title: 'Optimisation SOC', description: "Identification des angles morts et amélioration de la couverture de détection." },
+      { title: 'Validation des Contrôles', description: "Test de l'efficacité réelle des mesures de sécurité déployées." },
+      { title: 'Benchmark Sectoriel', description: 'Positionnement de la maturité cyber par rapport aux pairs du secteur.' }
+    ]
+  },
+  {
+    key: 'crise', label: 'Crise', color: '#ef4444',
+    colorBg: 'rgba(239,68,68,0.08)', colorBorder: 'rgba(239,68,68,0.25)',
+    colorGlow: 'rgba(239,68,68,0.15)',
+    icon: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    items: [
+      { title: 'Réponse Post-Incident', description: 'Analyse forensique complète suite à un incident de sécurité confirmé.' },
+      { title: 'Suspicion de Compromission', description: 'Investigation proactive suite à des signaux faibles ou comportements anormaux.' },
+      { title: 'Alerte CERT', description: 'Réaction rapide suite à une alerte CERT/CSIRT sur une vulnérabilité critique.' }
+    ]
+  }
+];
+
+let activeDomain = 'finance';
+
+function renderTabs() {
+  const container = document.getElementById('domain-tabs');
+  container.innerHTML = domains.map(d => {
+    const isActive = d.key === activeDomain;
+    return `<button class="domain-tab" data-key="${d.key}" style="
+      background:${isActive ? d.colorBg : 'rgba(13,17,23,0.6)'};
+      border-color:${isActive ? d.colorBorder : 'rgba(30,41,59,0.5)'};
+      color:${isActive ? d.color : 'var(--text-muted)'};
+      box-shadow:${isActive ? `0 0 20px ${d.colorGlow}` : 'none'};
+    ">${d.icon} <span>${d.label}</span><span class="count" style="color:${isActive ? d.color : ''};background:${isActive ? d.colorBg : ''}">${d.items.length}</span></button>`;
+  }).join('');
+  container.querySelectorAll('.domain-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeDomain = btn.dataset.key;
+      renderTabs();
+      renderCards();
+    });
+  });
+}
+
+function renderCards() {
+  const domain = domains.find(d => d.key === activeDomain);
+  const grid = document.getElementById('use-case-grid');
+  grid.style.opacity = '0';
+  setTimeout(() => {
+    grid.innerHTML = domain.items.map(item => `
+      <div class="use-case-card" style="border:1px solid ${domain.colorBorder}"
+        onmouseenter="this.style.boxShadow='0 0 25px ${domain.colorGlow}';this.style.borderColor='${domain.color}'"
+        onmouseleave="this.style.boxShadow='none';this.style.borderColor='${domain.colorBorder}'">
+        <span class="domain-badge" style="background:${domain.colorBg};color:${domain.color};border:1px solid ${domain.colorBorder}">
+          ${domain.icon} ${domain.label}
+        </span>
+        <h4 class="use-case-title">${item.title}</h4>
+        <p class="use-case-desc">${item.description}</p>
+        <div class="explore-link" style="color:${domain.color}">
+          <span>Explorer</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+      </div>
+    `).join('');
+    grid.style.opacity = '1';
+  }, 200);
+}
+
+renderTabs();
+renderCards();
+
+// ─── SYNERGIES HUB ───
+const satellites = [
+  { label: 'Blue Team', color: '#3b82f6', angle: 0,
+    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>` },
+  { label: 'Red Team', color: '#ef4444', angle: 90,
+    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg>` },
+  { label: 'GRC', color: '#22c55e', angle: 180,
+    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 11h8"/><path d="M8 15h5"/></svg>` },
+  { label: 'Academy', color: '#a855f7', angle: 270,
+    icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>` }
+];
+
+const svg = document.getElementById('hub-svg');
+const hubDiagram = document.getElementById('hub-diagram');
+const cx = 200, cy = 200, radius = 140;
+
+// Add lines and dots
+satellites.forEach((sat, i) => {
+  const rad = sat.angle * Math.PI / 180;
+  const x2 = cx + radius * Math.cos(rad);
+  const y2 = cy + radius * Math.sin(rad);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', cx); line.setAttribute('y1', cy);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', sat.color); line.setAttribute('stroke-width', '1.5');
+  line.setAttribute('stroke-opacity', '0.3');
+  line.style.opacity = '0';
+  line.style.transition = `opacity 0.5s ease ${0.3 + i * 0.15}s`;
+  svg.appendChild(line);
+  sat._line = line;
+});
+
+// Satellite DOM nodes
+satellites.forEach((sat, i) => {
+  const rad = sat.angle * Math.PI / 180;
+  const nx = cx + radius * Math.cos(rad) - 32;
+  const ny = cy + radius * Math.sin(rad) - 32;
+  const node = document.createElement('div');
+  node.className = 'sat-node';
+  node.style.cssText = `width:64px;height:64px;top:${ny}px;left:${nx}px;border:1.5px solid ${sat.color};box-shadow:0 0 20px ${sat.color}22;color:${sat.color};transition-delay:${0.5 + i * 0.12}s`;
+  node.innerHTML = sat.icon + `<span style="color:${sat.color}">${sat.label.split(' ')[0]}</span>`;
+  hubDiagram.appendChild(node);
+  sat._node = node;
+});
+
+// ─── INTERSECTION OBSERVER ───
+const revealEls = document.querySelectorAll('.reveal, .reveal-scale');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      // Handle hub activation
+      if (entry.target === document.querySelector('#hub-diagram')) {
+        activateHub();
+      }
+    }
+  });
+}, { threshold: 0.15, rootMargin: '-50px' });
+
+revealEls.forEach(el => observer.observe(el));
+
+// Also observe hub
+const hubEl = document.querySelector('#hub-diagram');
+if (hubEl) observer.observe(hubEl);
+
+function activateHub() {
+  satellites.forEach(sat => {
+    if (sat._line) sat._line.style.opacity = '1';
+    if (sat._node) sat._node.classList.add('visible');
+  });
+}
+</script>
+</body>
+</html>
